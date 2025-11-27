@@ -33,6 +33,7 @@ interface Rumah {
   no_hp: string | null;
   email: string | null;
   status: string;
+  user_id: string | null;
 }
 
 export default function DataRumahPage() {
@@ -82,6 +83,22 @@ export default function DataRumahPage() {
           .eq('id', editingRumah.id);
 
         if (error) throw error;
+
+        // Jika email berubah dan ada user_id terhubung, update juga email auth user
+        if (editingRumah.user_id && formData.email !== editingRumah.email && formData.email) {
+          try {
+            const { error: emailError } = await supabase.functions.invoke('update-user-email', {
+              body: { user_id: editingRumah.user_id, new_email: formData.email }
+            });
+            if (emailError) {
+              console.error('Error updating auth email:', emailError);
+              toast.warning('Data rumah tersimpan, tapi email login gagal diperbarui');
+            }
+          } catch (emailErr) {
+            console.error('Error calling update-user-email:', emailErr);
+          }
+        }
+
         toast.success('Data rumah berhasil diperbarui');
       } else {
         const { error } = await supabase.from('rumah').insert(formData);
