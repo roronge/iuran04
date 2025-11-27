@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { StatCard } from '@/components/ui/stat-card';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Table,
   TableBody,
@@ -23,12 +24,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency, getMonthName, getCurrentMonth, getCurrentYear } from '@/lib/format';
 import { toast } from 'sonner';
 import { Loader2, Eye, Trash2, RefreshCw, CheckCircle } from 'lucide-react';
+import { SendNotificationDialog } from '@/components/notifications/SendNotificationDialog';
 
 interface TagihanGroup {
   rumah_id: string;
   blok: string | null;
   no_rumah: string;
   kepala_keluarga: string;
+  email: string | null;
   totalTagihan: number;
   totalBayar: number;
   status: 'belum' | 'lunas' | 'sebagian';
@@ -38,8 +41,11 @@ interface TagihanGroup {
 interface TagihanItem {
   id: string;
   kategori_nama: string;
+  kategori_id: string;
   nominal: number;
   status: string;
+  bulan: number;
+  tahun: number;
 }
 
 export default function DaftarTagihanPage() {
@@ -49,6 +55,7 @@ export default function DaftarTagihanPage() {
   const [tahun, setTahun] = useState(getCurrentYear().toString());
   const [selectedGroup, setSelectedGroup] = useState<TagihanGroup | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [selectedRumahIds, setSelectedRumahIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchTagihan();
@@ -64,8 +71,11 @@ export default function DaftarTagihanPage() {
           rumah_id,
           nominal,
           status,
-          rumah (blok, no_rumah, kepala_keluarga),
-          kategori_iuran (nama)
+          bulan,
+          tahun,
+          kategori_id,
+          rumah (blok, no_rumah, kepala_keluarga, email),
+          kategori_iuran (id, nama)
         `)
         .eq('bulan', parseInt(bulan))
         .eq('tahun', parseInt(tahun));
@@ -83,6 +93,7 @@ export default function DaftarTagihanPage() {
             blok: item.rumah?.blok,
             no_rumah: item.rumah?.no_rumah || '',
             kepala_keluarga: item.rumah?.kepala_keluarga || '',
+            email: item.rumah?.email || null,
             totalTagihan: 0,
             totalBayar: 0,
             status: 'belum',
@@ -98,8 +109,11 @@ export default function DaftarTagihanPage() {
         group.items.push({
           id: item.id,
           kategori_nama: item.kategori_iuran?.nama || '',
+          kategori_id: item.kategori_id,
           nominal: item.nominal,
           status: item.status,
+          bulan: item.bulan,
+          tahun: item.tahun,
         });
       });
 
@@ -115,6 +129,7 @@ export default function DaftarTagihanPage() {
       });
 
       setTagihanGroups(Array.from(groupMap.values()));
+      setSelectedRumahIds(new Set());
     } catch (error) {
       console.error('Error:', error);
       toast.error('Gagal memuat data tagihan');
@@ -180,8 +195,57 @@ export default function DaftarTagihanPage() {
     }
   };
 
+  const toggleSelectRumah = (rumahId: string) => {
+    const newSet = new Set(selectedRumahIds);
+    if (newSet.has(rumahId)) {
+      newSet.delete(rumahId);
+    } else {
+      newSet.add(rumahId);
+    }
+    setSelectedRumahIds(newSet);
+  };
+
+  const toggleSelectAll = () => {
+    const belumLunasGroups = tagihanGroups.filter(g => g.status !== 'lunas');
+    if (selectedRumahIds.size === belumLunasGroups.length) {
+      setSelectedRumahIds(new Set());
+    } else {
+      setSelectedRumahIds(new Set(belumLunasGroups.map(g => g.rumah_id)));
+    }
+  };
+
+  const getSelectedTagihan = () => {
+    const result: any[] = [];
+    tagihanGroups
+      .filter(g => selectedRumahIds.has(g.rumah_id))
+      .forEach(group => {
+        group.items
+          .filter(item => item.status !== 'lunas')
+          .forEach(item => {
+            result.push({
+              id: item.id,
+              rumah_id: group.rumah_id,
+              nominal: item.nominal,
+              bulan: item.bulan,
+              tahun: item.tahun,
+              rumah: {
+                kepala_keluarga: group.kepala_keluarga,
+                no_rumah: group.no_rumah,
+                blok: group.blok,
+                email: group.email,
+              },
+              kategori_iuran: {
+                nama: item.kategori_nama,
+              },
+            });
+          });
+      });
+    return result;
+  };
+
   const totalTagihan = tagihanGroups.reduce((sum, g) => sum + g.totalTagihan, 0);
   const totalBayar = tagihanGroups.reduce((sum, g) => sum + g.totalBayar, 0);
+  const belumLunasCount = tagihanGroups.filter(g => g.status !== 'lunas').length;
 
   if (loading) {
     return (
@@ -203,7 +267,7 @@ export default function DaftarTagihanPage() {
               Lihat status pembayaran iuran per rumah untuk bulan tertentu.
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Input
               type="number"
               className="w-20"
@@ -238,12 +302,33 @@ export default function DaftarTagihanPage() {
           />
         </div>
 
+        {/* Notification Actions */}
+        <div className="flex items-center gap-4">
+          <SendNotificationDialog 
+            selectedTagihan={getSelectedTagihan()} 
+            onSuccess={fetchTagihan}
+          />
+          <span className="text-sm text-muted-foreground">
+            {selectedRumahIds.size > 0 
+              ? `${selectedRumahIds.size} rumah dipilih`
+              : `Pilih rumah yang belum lunas untuk kirim notifikasi`
+            }
+          </span>
+        </div>
+
         <Card>
           <CardContent className="pt-6">
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-12">
+                      <Checkbox
+                        checked={selectedRumahIds.size === belumLunasCount && belumLunasCount > 0}
+                        onCheckedChange={toggleSelectAll}
+                        disabled={belumLunasCount === 0}
+                      />
+                    </TableHead>
                     <TableHead>Rumah</TableHead>
                     <TableHead>KK</TableHead>
                     <TableHead>Total Tagihan</TableHead>
@@ -255,13 +340,20 @@ export default function DaftarTagihanPage() {
                 <TableBody>
                   {tagihanGroups.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                         Belum ada tagihan untuk periode ini.
                       </TableCell>
                     </TableRow>
                   ) : (
                     tagihanGroups.map((group) => (
                       <TableRow key={group.rumah_id}>
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedRumahIds.has(group.rumah_id)}
+                            onCheckedChange={() => toggleSelectRumah(group.rumah_id)}
+                            disabled={group.status === 'lunas'}
+                          />
+                        </TableCell>
                         <TableCell className="font-medium">
                           {group.blok} {group.no_rumah}
                         </TableCell>

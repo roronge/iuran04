@@ -76,6 +76,54 @@ export type Database = {
         }
         Relationships: []
       }
+      notifications: {
+        Row: {
+          created_at: string
+          dibaca: boolean
+          id: string
+          jenis: string
+          judul: string
+          pesan: string
+          rumah_id: string
+          tagihan_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          dibaca?: boolean
+          id?: string
+          jenis?: string
+          judul: string
+          pesan: string
+          rumah_id: string
+          tagihan_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          dibaca?: boolean
+          id?: string
+          jenis?: string
+          judul?: string
+          pesan?: string
+          rumah_id?: string
+          tagihan_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_rumah_id_fkey"
+            columns: ["rumah_id"]
+            isOneToOne: false
+            referencedRelation: "rumah"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_tagihan_id_fkey"
+            columns: ["tagihan_id"]
+            isOneToOne: false
+            referencedRelation: "tagihan"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string

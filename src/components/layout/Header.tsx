@@ -1,6 +1,7 @@
-import { Home, LogOut, User } from 'lucide-react';
+import { LogOut, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
 
 export function Header() {
   const { user, role, signOut } = useAuth();
@@ -19,6 +20,7 @@ export function Header() {
         </div>
 
         <div className="flex items-center gap-2">
+          {role === 'warga' && <NotificationBell />}
           <div className="hidden sm:flex items-center gap-2 text-sm">
             <User className="h-4 w-4" />
             <span className="font-medium">{user?.email}</span>
