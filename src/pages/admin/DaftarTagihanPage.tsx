@@ -168,15 +168,26 @@ export default function DaftarTagihanPage() {
       if (kasError) throw kasError;
 
       toast.success('Pembayaran berhasil dicatat');
-      fetchTagihan();
-      
-      // Update selected group if dialog is open
+
+      // Update local state immediately for instant UI feedback
       if (selectedGroup) {
-        const updatedGroup = tagihanGroups.find(g => g.rumah_id === selectedGroup.rumah_id);
-        if (updatedGroup) {
-          setSelectedGroup(updatedGroup);
-        }
+        const updatedItems = selectedGroup.items.map(item =>
+          item.id === tagihanId ? { ...item, status: 'lunas' } : item
+        );
+        const updatedBayar = updatedItems
+          .filter(i => i.status === 'lunas')
+          .reduce((sum, i) => sum + i.nominal, 0);
+        
+        setSelectedGroup({
+          ...selectedGroup,
+          items: updatedItems,
+          totalBayar: updatedBayar,
+          status: updatedBayar >= selectedGroup.totalTagihan ? 'lunas' : updatedBayar > 0 ? 'sebagian' : 'belum',
+        });
       }
+
+      // Refresh full data in background
+      fetchTagihan();
     } catch (error: any) {
       toast.error('Gagal memproses pembayaran', { description: error.message });
     }
