@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { formatCurrency, getMonthName, getCurrentMonth, getCurrentYear } from '@/lib/format';
-import { Loader2, Receipt, CheckCircle, AlertCircle } from 'lucide-react';
+import { Loader2, Receipt, CheckCircle, AlertCircle, Clock } from 'lucide-react';
 
 interface Tagihan {
   id: string;
@@ -29,6 +29,7 @@ export default function WargaDashboard() {
   const { user } = useAuth();
   const [rumahInfo, setRumahInfo] = useState<RumahInfo | null>(null);
   const [tagihan, setTagihan] = useState<Tagihan[]>([]);
+  const [tunggakan, setTunggakan] = useState<Tagihan[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -39,7 +40,6 @@ export default function WargaDashboard() {
 
   const fetchData = async () => {
     try {
-      // Fetch rumah info
       const { data: rumahData } = await supabase
         .from('rumah')
         .select('id, blok, no_rumah, kepala_keluarga')
@@ -49,10 +49,10 @@ export default function WargaDashboard() {
       if (rumahData) {
         setRumahInfo(rumahData);
 
-        // Fetch tagihan for this month
         const currentMonth = getCurrentMonth();
         const currentYear = getCurrentYear();
 
+        // Fetch tagihan for this month
         const { data: tagihanData } = await supabase
           .from('tagihan')
           .select(`
@@ -68,6 +68,25 @@ export default function WargaDashboard() {
           .eq('tahun', currentYear);
 
         setTagihan(tagihanData || []);
+
+        // Fetch unpaid bills from previous months (tunggakan)
+        const { data: tunggakanData } = await supabase
+          .from('tagihan')
+          .select(`
+            id,
+            bulan,
+            tahun,
+            nominal,
+            status,
+            kategori_iuran (nama)
+          `)
+          .eq('rumah_id', rumahData.id)
+          .eq('status', 'belum')
+          .or(`tahun.lt.${currentYear},and(tahun.eq.${currentYear},bulan.lt.${currentMonth})`)
+          .order('tahun', { ascending: false })
+          .order('bulan', { ascending: false });
+
+        setTunggakan(tunggakanData || []);
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -109,6 +128,7 @@ export default function WargaDashboard() {
   const totalTagihan = tagihan.reduce((sum, t) => sum + t.nominal, 0);
   const totalTerbayar = tagihan.filter(t => t.status === 'lunas').reduce((sum, t) => sum + t.nominal, 0);
   const totalBelumBayar = totalTagihan - totalTerbayar;
+  const totalTunggakan = tunggakan.reduce((sum, t) => sum + t.nominal, 0);
 
   return (
     <AppLayout>
@@ -120,7 +140,7 @@ export default function WargaDashboard() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <StatCard
             title="Total Tagihan"
             value={formatCurrency(totalTagihan)}
@@ -137,7 +157,42 @@ export default function WargaDashboard() {
             value={formatCurrency(totalBelumBayar)}
             variant="pink"
           />
+          <StatCard
+            title="Tunggakan"
+            value={formatCurrency(totalTunggakan)}
+            subtitle="Bulan sebelumnya"
+            variant="pink"
+          />
         </div>
+
+        {tunggakan.length > 0 && (
+          <Card className="border-destructive/50">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2 text-destructive">
+                <Clock className="h-5 w-5" />
+                Tunggakan Bulan Sebelumnya
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {tunggakan.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between p-3 rounded-lg bg-destructive/5"
+                  >
+                    <div>
+                      <p className="font-medium">{item.kategori_iuran?.nama}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {getMonthName(item.bulan)} {item.tahun} • {formatCurrency(item.nominal)}
+                      </p>
+                    </div>
+                    <Badge variant="destructive">Belum Bayar</Badge>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader>
