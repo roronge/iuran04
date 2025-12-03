@@ -20,6 +20,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency, getMonthName, getCurrentMonth, getCurrentYear } from '@/lib/format';
 import { toast } from 'sonner';
@@ -56,6 +66,8 @@ export default function DaftarTagihanPage() {
   const [selectedGroup, setSelectedGroup] = useState<TagihanGroup | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [selectedRumahIds, setSelectedRumahIds] = useState<Set<string>>(new Set());
+  const [confirmPayment, setConfirmPayment] = useState<{ type: 'single' | 'all'; tagihanId?: string } | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
     fetchTagihan();
@@ -139,8 +151,8 @@ export default function DaftarTagihanPage() {
   };
 
   const handleBayar = async (tagihanId: string) => {
+    setIsProcessing(true);
     try {
-      // Get tagihan info
       const { data: tagihan, error: fetchError } = await supabase
         .from('tagihan')
         .select('nominal, rumah_id, kategori_iuran(nama), rumah(kepala_keluarga)')
@@ -149,7 +161,6 @@ export default function DaftarTagihanPage() {
 
       if (fetchError) throw fetchError;
 
-      // Update tagihan status
       const { error: updateError } = await supabase
         .from('tagihan')
         .update({ status: 'lunas', tanggal_bayar: new Date().toISOString() })
@@ -157,7 +168,6 @@ export default function DaftarTagihanPage() {
 
       if (updateError) throw updateError;
 
-      // Create buku kas entry
       const { error: kasError } = await supabase.from('buku_kas').insert({
         keterangan: `Pembayaran ${(tagihan as any).kategori_iuran?.nama} - ${(tagihan as any).rumah?.kepala_keluarga}`,
         jenis: 'masuk',
@@ -169,7 +179,6 @@ export default function DaftarTagihanPage() {
 
       toast.success('Pembayaran berhasil dicatat');
 
-      // Update local state immediately for instant UI feedback
       if (selectedGroup) {
         const updatedItems = selectedGroup.items.map(item =>
           item.id === tagihanId ? { ...item, status: 'lunas' } : item
@@ -186,10 +195,65 @@ export default function DaftarTagihanPage() {
         });
       }
 
-      // Refresh full data in background
       fetchTagihan();
     } catch (error: any) {
       toast.error('Gagal memproses pembayaran', { description: error.message });
+    } finally {
+      setIsProcessing(false);
+      setConfirmPayment(null);
+    }
+  };
+
+  const handleBayarSemua = async () => {
+    if (!selectedGroup) return;
+    
+    const belumLunas = selectedGroup.items.filter(item => item.status !== 'lunas');
+    if (belumLunas.length === 0) return;
+
+    setIsProcessing(true);
+    try {
+      for (const item of belumLunas) {
+        const { error: updateError } = await supabase
+          .from('tagihan')
+          .update({ status: 'lunas', tanggal_bayar: new Date().toISOString() })
+          .eq('id', item.id);
+
+        if (updateError) throw updateError;
+
+        const { error: kasError } = await supabase.from('buku_kas').insert({
+          keterangan: `Pembayaran ${item.kategori_nama} - ${selectedGroup.kepala_keluarga}`,
+          jenis: 'masuk',
+          nominal: item.nominal,
+          tagihan_id: item.id,
+        });
+
+        if (kasError) throw kasError;
+      }
+
+      toast.success(`${belumLunas.length} tagihan berhasil dibayar`);
+
+      const updatedItems = selectedGroup.items.map(item => ({ ...item, status: 'lunas' }));
+      setSelectedGroup({
+        ...selectedGroup,
+        items: updatedItems,
+        totalBayar: selectedGroup.totalTagihan,
+        status: 'lunas',
+      });
+
+      fetchTagihan();
+    } catch (error: any) {
+      toast.error('Gagal memproses pembayaran', { description: error.message });
+    } finally {
+      setIsProcessing(false);
+      setConfirmPayment(null);
+    }
+  };
+
+  const confirmAndPay = () => {
+    if (confirmPayment?.type === 'single' && confirmPayment.tagihanId) {
+      handleBayar(confirmPayment.tagihanId);
+    } else if (confirmPayment?.type === 'all') {
+      handleBayarSemua();
     }
   };
 
@@ -411,9 +475,20 @@ export default function DaftarTagihanPage() {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              {selectedGroup?.kepala_keluarga} • {getMonthName(parseInt(bulan))} {tahun}
-            </p>
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
+                {selectedGroup?.kepala_keluarga} • {getMonthName(parseInt(bulan))} {tahun}
+              </p>
+              {selectedGroup && selectedGroup.items.some(i => i.status !== 'lunas') && (
+                <Button
+                  size="sm"
+                  onClick={() => setConfirmPayment({ type: 'all' })}
+                  disabled={isProcessing}
+                >
+                  Bayar Semua
+                </Button>
+              )}
+            </div>
             <div className="space-y-2">
               {selectedGroup?.items.map((item) => (
                 <div
@@ -435,7 +510,8 @@ export default function DaftarTagihanPage() {
                       <>
                         <Button
                           size="sm"
-                          onClick={() => handleBayar(item.id)}
+                          onClick={() => setConfirmPayment({ type: 'single', tagihanId: item.id })}
+                          disabled={isProcessing}
                         >
                           Bayar
                         </Button>
@@ -456,6 +532,26 @@ export default function DaftarTagihanPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!confirmPayment} onOpenChange={(open) => !open && setConfirmPayment(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Konfirmasi Pembayaran</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmPayment?.type === 'all'
+                ? `Apakah Anda yakin ingin membayar semua tagihan (${selectedGroup?.items.filter(i => i.status !== 'lunas').length} item) untuk ${selectedGroup?.kepala_keluarga}?`
+                : 'Apakah Anda yakin ingin memproses pembayaran ini?'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isProcessing}>Batal</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmAndPay} disabled={isProcessing}>
+              {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Ya, Bayar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 }
