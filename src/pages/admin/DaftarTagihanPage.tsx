@@ -33,8 +33,9 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency, getMonthName, getCurrentMonth, getCurrentYear } from '@/lib/format';
 import { toast } from 'sonner';
-import { Loader2, Eye, Trash2, RefreshCw, CheckCircle } from 'lucide-react';
+import { Loader2, Eye, Trash2, RefreshCw, CheckCircle, Printer } from 'lucide-react';
 import { SendNotificationDialog } from '@/components/notifications/SendNotificationDialog';
+import { PaymentReceipt, ReceiptData } from '@/components/receipt/PaymentReceipt';
 
 interface TagihanGroup {
   rumah_id: string;
@@ -68,6 +69,8 @@ export default function DaftarTagihanPage() {
   const [selectedRumahIds, setSelectedRumahIds] = useState<Set<string>>(new Set());
   const [confirmPayment, setConfirmPayment] = useState<{ type: 'single' | 'all'; tagihanId?: string } | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
+  const [isReceiptOpen, setIsReceiptOpen] = useState(false);
 
   useEffect(() => {
     fetchTagihan();
@@ -155,15 +158,17 @@ export default function DaftarTagihanPage() {
     try {
       const { data: tagihan, error: fetchError } = await supabase
         .from('tagihan')
-        .select('nominal, rumah_id, kategori_iuran(nama), rumah(kepala_keluarga)')
+        .select('nominal, rumah_id, bulan, tahun, kategori_iuran(nama), rumah(kepala_keluarga, blok, no_rumah)')
         .eq('id', tagihanId)
         .single();
 
       if (fetchError) throw fetchError;
 
+      const tanggalBayar = new Date().toISOString();
+
       const { error: updateError } = await supabase
         .from('tagihan')
-        .update({ status: 'lunas', tanggal_bayar: new Date().toISOString() })
+        .update({ status: 'lunas', tanggal_bayar: tanggalBayar })
         .eq('id', tagihanId);
 
       if (updateError) throw updateError;
@@ -178,6 +183,19 @@ export default function DaftarTagihanPage() {
       if (kasError) throw kasError;
 
       toast.success('Pembayaran berhasil dicatat');
+
+      // Show receipt
+      setReceiptData({
+        id: tagihanId,
+        kepala_keluarga: (tagihan as any).rumah?.kepala_keluarga || '',
+        alamat: `${(tagihan as any).rumah?.blok || ''} ${(tagihan as any).rumah?.no_rumah || ''}`.trim(),
+        items: [{ kategori: (tagihan as any).kategori_iuran?.nama || '', nominal: tagihan.nominal }],
+        total: tagihan.nominal,
+        bulan: tagihan.bulan,
+        tahun: tagihan.tahun,
+        tanggal_bayar: tanggalBayar,
+      });
+      setIsReceiptOpen(true);
 
       if (selectedGroup) {
         const updatedItems = selectedGroup.items.map(item =>
@@ -211,11 +229,13 @@ export default function DaftarTagihanPage() {
     if (belumLunas.length === 0) return;
 
     setIsProcessing(true);
+    const tanggalBayar = new Date().toISOString();
+    
     try {
       for (const item of belumLunas) {
         const { error: updateError } = await supabase
           .from('tagihan')
-          .update({ status: 'lunas', tanggal_bayar: new Date().toISOString() })
+          .update({ status: 'lunas', tanggal_bayar: tanggalBayar })
           .eq('id', item.id);
 
         if (updateError) throw updateError;
@@ -231,6 +251,19 @@ export default function DaftarTagihanPage() {
       }
 
       toast.success(`${belumLunas.length} tagihan berhasil dibayar`);
+
+      // Show receipt for all payments
+      setReceiptData({
+        id: belumLunas[0].id,
+        kepala_keluarga: selectedGroup.kepala_keluarga,
+        alamat: `${selectedGroup.blok || ''} ${selectedGroup.no_rumah}`.trim(),
+        items: belumLunas.map(item => ({ kategori: item.kategori_nama, nominal: item.nominal })),
+        total: belumLunas.reduce((sum, item) => sum + item.nominal, 0),
+        bulan: parseInt(bulan),
+        tahun: parseInt(tahun),
+        tanggal_bayar: tanggalBayar,
+      });
+      setIsReceiptOpen(true);
 
       const updatedItems = selectedGroup.items.map(item => ({ ...item, status: 'lunas' }));
       setSelectedGroup({
@@ -255,6 +288,28 @@ export default function DaftarTagihanPage() {
     } else if (confirmPayment?.type === 'all') {
       handleBayarSemua();
     }
+  };
+
+  const handleViewReceipt = async (item: TagihanItem) => {
+    if (!selectedGroup) return;
+    
+    const { data: tagihan } = await supabase
+      .from('tagihan')
+      .select('tanggal_bayar')
+      .eq('id', item.id)
+      .single();
+
+    setReceiptData({
+      id: item.id,
+      kepala_keluarga: selectedGroup.kepala_keluarga,
+      alamat: `${selectedGroup.blok || ''} ${selectedGroup.no_rumah}`.trim(),
+      items: [{ kategori: item.kategori_nama, nominal: item.nominal }],
+      total: item.nominal,
+      bulan: item.bulan,
+      tahun: item.tahun,
+      tanggal_bayar: tagihan?.tanggal_bayar || new Date().toISOString(),
+    });
+    setIsReceiptOpen(true);
   };
 
   const handleDelete = async (tagihanId: string) => {
@@ -503,9 +558,18 @@ export default function DaftarTagihanPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     {item.status === 'lunas' ? (
-                      <Badge className="bg-success">
-                        <CheckCircle className="h-3 w-3 mr-1" /> Lunas
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge className="bg-success">
+                          <CheckCircle className="h-3 w-3 mr-1" /> Lunas
+                        </Badge>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleViewReceipt(item)}
+                        >
+                          <Printer className="h-4 w-4" />
+                        </Button>
+                      </div>
                     ) : (
                       <>
                         <Button
@@ -552,6 +616,12 @@ export default function DaftarTagihanPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <PaymentReceipt
+        open={isReceiptOpen}
+        onOpenChange={setIsReceiptOpen}
+        data={receiptData}
+      />
     </AppLayout>
   );
 }
