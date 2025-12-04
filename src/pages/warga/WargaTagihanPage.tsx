@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { formatCurrency, getMonthName } from '@/lib/format';
-import { Loader2, Receipt, CheckCircle, AlertCircle, Calendar } from 'lucide-react';
+import { Loader2, Receipt, CheckCircle, AlertCircle, Calendar, Printer } from 'lucide-react';
+import { PaymentReceipt, ReceiptData } from '@/components/receipt/PaymentReceipt';
 
 interface Tagihan {
   id: string;
@@ -19,11 +21,20 @@ interface Tagihan {
   } | null;
 }
 
+interface RumahInfo {
+  id: string;
+  kepala_keluarga: string;
+  blok: string | null;
+  no_rumah: string;
+}
+
 export default function WargaTagihanPage() {
   const { user } = useAuth();
   const [tagihanList, setTagihanList] = useState<Tagihan[]>([]);
   const [loading, setLoading] = useState(true);
-  const [rumahId, setRumahId] = useState<string | null>(null);
+  const [rumahInfo, setRumahInfo] = useState<RumahInfo | null>(null);
+  const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
+  const [isReceiptOpen, setIsReceiptOpen] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -33,10 +44,10 @@ export default function WargaTagihanPage() {
 
   const fetchRumahAndTagihan = async () => {
     try {
-      // Get rumah ID
+      // Get rumah info
       const { data: rumahData } = await supabase
         .from('rumah')
-        .select('id')
+        .select('id, kepala_keluarga, blok, no_rumah')
         .eq('user_id', user?.id)
         .maybeSingle();
 
@@ -45,7 +56,7 @@ export default function WargaTagihanPage() {
         return;
       }
 
-      setRumahId(rumahData.id);
+      setRumahInfo(rumahData);
 
       // Fetch all tagihan
       const { data: tagihanData } = await supabase
@@ -71,6 +82,22 @@ export default function WargaTagihanPage() {
     }
   };
 
+  const handleViewReceipt = (item: Tagihan) => {
+    if (!rumahInfo || !item.tanggal_bayar) return;
+    
+    setReceiptData({
+      id: item.id,
+      kepala_keluarga: rumahInfo.kepala_keluarga,
+      alamat: `${rumahInfo.blok || ''} ${rumahInfo.no_rumah}`.trim(),
+      items: [{ kategori: item.kategori_iuran?.nama || '', nominal: item.nominal }],
+      total: item.nominal,
+      bulan: item.bulan,
+      tahun: item.tahun,
+      tanggal_bayar: item.tanggal_bayar,
+    });
+    setIsReceiptOpen(true);
+  };
+
   if (loading) {
     return (
       <AppLayout>
@@ -81,7 +108,7 @@ export default function WargaTagihanPage() {
     );
   }
 
-  if (!rumahId) {
+  if (!rumahInfo) {
     return (
       <AppLayout>
         <Card className="border-warning bg-warning-light">
@@ -171,16 +198,26 @@ export default function WargaTagihanPage() {
                             {formatCurrency(item.nominal)}
                           </p>
                         </div>
-                        <Badge
-                          variant={item.status === 'lunas' ? 'default' : 'secondary'}
-                          className={item.status === 'lunas' ? 'bg-success' : 'bg-destructive text-destructive-foreground'}
-                        >
+                        <div className="flex items-center gap-2">
                           {item.status === 'lunas' ? (
-                            <><CheckCircle className="h-3 w-3 mr-1" /> Lunas</>
+                            <>
+                              <Badge className="bg-success">
+                                <CheckCircle className="h-3 w-3 mr-1" /> Lunas
+                              </Badge>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleViewReceipt(item)}
+                              >
+                                <Printer className="h-4 w-4" />
+                              </Button>
+                            </>
                           ) : (
-                            'Belum'
+                            <Badge className="bg-destructive text-destructive-foreground">
+                              Belum
+                            </Badge>
                           )}
-                        </Badge>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -194,6 +231,12 @@ export default function WargaTagihanPage() {
           </div>
         )}
       </div>
+
+      <PaymentReceipt
+        open={isReceiptOpen}
+        onOpenChange={setIsReceiptOpen}
+        data={receiptData}
+      />
     </AppLayout>
   );
 }
