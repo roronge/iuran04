@@ -4,18 +4,18 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 
 const adminNavItems = [
-  { icon: Home, label: 'Dashboard', path: '/admin' },
-  { icon: Users, label: 'Data Rumah', path: '/admin/rumah' },
-  { icon: Tag, label: 'Kategori Iuran', path: '/admin/kategori' },
-  { icon: Settings, label: 'Generate Tagihan', path: '/admin/generate' },
-  { icon: FileText, label: 'Daftar Tagihan', path: '/admin/tagihan' },
-  { icon: BookOpen, label: 'Buku Kas', path: '/admin/kas' },
-  { icon: BarChart3, label: 'Laporan Iuran', path: '/admin/laporan' },
+  { icon: Home, label: 'Dashboard', path: '/admin', end: true },
+  { icon: Users, label: 'Data Rumah', path: '/admin/rumah', end: false },
+  { icon: Tag, label: 'Kategori Iuran', path: '/admin/kategori', end: false },
+  { icon: Settings, label: 'Generate Tagihan', path: '/admin/generate', end: false },
+  { icon: FileText, label: 'Daftar Tagihan', path: '/admin/tagihan', end: false },
+  { icon: BookOpen, label: 'Buku Kas', path: '/admin/kas', end: false },
+  { icon: BarChart3, label: 'Laporan Iuran', path: '/admin/laporan', end: false },
 ];
 
 const wargaNavItems = [
-  { icon: Home, label: 'Dashboard', path: '/warga' },
-  { icon: Receipt, label: 'Tagihan Saya', path: '/warga/tagihan' },
+  { icon: Home, label: 'Dashboard', path: '/warga', end: true },
+  { icon: Receipt, label: 'Tagihan Saya', path: '/warga/tagihan', end: false },
 ];
 
 export function Sidebar() {
@@ -29,6 +29,7 @@ export function Sidebar() {
           <NavLink
             key={item.path}
             to={item.path}
+            end={item.end}
             className={({ isActive }) =>
               cn(
                 'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all',

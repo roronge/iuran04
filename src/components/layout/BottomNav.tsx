@@ -4,16 +4,16 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 
 const adminNavItems = [
-  { icon: Home, label: 'Home', path: '/admin' },
-  { icon: Users, label: 'Rumah', path: '/admin/rumah' },
-  { icon: Tag, label: 'Kategori', path: '/admin/kategori' },
-  { icon: FileText, label: 'Tagihan', path: '/admin/tagihan' },
-  { icon: BookOpen, label: 'Kas', path: '/admin/kas' },
+  { icon: Home, label: 'Home', path: '/admin', end: true },
+  { icon: Users, label: 'Rumah', path: '/admin/rumah', end: false },
+  { icon: Tag, label: 'Kategori', path: '/admin/kategori', end: false },
+  { icon: FileText, label: 'Tagihan', path: '/admin/tagihan', end: false },
+  { icon: BookOpen, label: 'Kas', path: '/admin/kas', end: false },
 ];
 
 const wargaNavItems = [
-  { icon: Home, label: 'Home', path: '/warga' },
-  { icon: Receipt, label: 'Tagihan', path: '/warga/tagihan' },
+  { icon: Home, label: 'Home', path: '/warga', end: true },
+  { icon: Receipt, label: 'Tagihan', path: '/warga/tagihan', end: false },
 ];
 
 export function BottomNav() {
@@ -27,6 +27,7 @@ export function BottomNav() {
           <NavLink
             key={item.path}
             to={item.path}
+            end={item.end}
             className={({ isActive }) =>
               cn(
                 'flex flex-col items-center justify-center flex-1 h-full gap-1 transition-colors',
