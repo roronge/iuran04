@@ -24,8 +24,16 @@ export default function LoginPage() {
     );
   }
 
-  if (user && role) {
-    return <Navigate to={role === 'admin' ? '/admin' : '/warga'} replace />;
+  if (user) {
+    if (role) {
+      return <Navigate to={role === 'admin' ? '/admin' : '/warga'} replace />;
+    }
+    // Role masih loading, tampilkan loader
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-teal-light to-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
   }
 
   const handleLogin = async (e: React.FormEvent) => {
