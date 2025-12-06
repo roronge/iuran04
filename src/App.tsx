@@ -14,12 +14,17 @@ import BukuKasPage from "./pages/admin/BukuKasPage";
 import LaporanIuranPage from "./pages/admin/LaporanIuranPage";
 import WargaDashboard from "./pages/warga/WargaDashboard";
 import WargaTagihanPage from "./pages/warga/WargaTagihanPage";
+import SuperAdminDashboard from "./pages/superadmin/SuperAdminDashboard";
+import ManageRTPage from "./pages/superadmin/ManageRTPage";
+import ManageAdminPage from "./pages/superadmin/ManageAdminPage";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
 
-function ProtectedRoute({ children, allowedRole }: { children: React.ReactNode; allowedRole?: 'admin' | 'warga' }) {
+type AllowedRole = 'admin' | 'warga' | 'super_admin';
+
+function ProtectedRoute({ children, allowedRole }: { children: React.ReactNode; allowedRole?: AllowedRole }) {
   const { user, role, loading } = useAuth();
 
   if (loading) {
@@ -35,7 +40,8 @@ function ProtectedRoute({ children, allowedRole }: { children: React.ReactNode; 
   }
 
   if (allowedRole && role !== allowedRole) {
-    return <Navigate to={role === 'admin' ? '/admin' : '/warga'} replace />;
+    const redirectPath = role === 'super_admin' ? '/superadmin' : role === 'admin' ? '/admin' : '/warga';
+    return <Navigate to={redirectPath} replace />;
   }
 
   return <>{children}</>;
@@ -46,6 +52,11 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/" element={<Navigate to="/login" replace />} />
+      
+      {/* Super Admin Routes */}
+      <Route path="/superadmin" element={<ProtectedRoute allowedRole="super_admin"><SuperAdminDashboard /></ProtectedRoute>} />
+      <Route path="/superadmin/rt" element={<ProtectedRoute allowedRole="super_admin"><ManageRTPage /></ProtectedRoute>} />
+      <Route path="/superadmin/admin" element={<ProtectedRoute allowedRole="super_admin"><ManageAdminPage /></ProtectedRoute>} />
       
       {/* Admin Routes */}
       <Route path="/admin" element={<ProtectedRoute allowedRole="admin"><AdminDashboard /></ProtectedRoute>} />

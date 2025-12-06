@@ -1,7 +1,13 @@
-import { Home, Users, Tag, FileText, BookOpen, BarChart3, Receipt } from 'lucide-react';
+import { Home, Users, Tag, FileText, BookOpen, Receipt, Building2, Shield } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
+
+const superAdminNavItems = [
+  { icon: Home, label: 'Home', path: '/superadmin', end: true },
+  { icon: Building2, label: 'RT', path: '/superadmin/rt', end: false },
+  { icon: Shield, label: 'Admin', path: '/superadmin/admin', end: false },
+];
 
 const adminNavItems = [
   { icon: Home, label: 'Home', path: '/admin', end: true },
@@ -18,7 +24,7 @@ const wargaNavItems = [
 
 export function BottomNav() {
   const { role } = useAuth();
-  const navItems = role === 'admin' ? adminNavItems : wargaNavItems;
+  const navItems = role === 'super_admin' ? superAdminNavItems : role === 'admin' ? adminNavItems : wargaNavItems;
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border pb-safe md:hidden">
