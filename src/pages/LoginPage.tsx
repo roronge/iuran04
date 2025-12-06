@@ -26,7 +26,8 @@ export default function LoginPage() {
 
   if (user) {
     if (role) {
-      return <Navigate to={role === 'admin' ? '/admin' : '/warga'} replace />;
+      const redirectPath = role === 'super_admin' ? '/superadmin' : role === 'admin' ? '/admin' : '/warga';
+      return <Navigate to={redirectPath} replace />;
     }
     // Role masih loading, tampilkan loader
     return (

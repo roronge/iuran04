@@ -1,7 +1,13 @@
-import { Home, Users, Tag, FileText, BookOpen, BarChart3, Settings, Receipt } from 'lucide-react';
+import { Home, Users, Tag, FileText, BookOpen, BarChart3, Settings, Receipt, Building2, Shield } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
+
+const superAdminNavItems = [
+  { icon: Home, label: 'Dashboard', path: '/superadmin', end: true },
+  { icon: Building2, label: 'Kelola RT', path: '/superadmin/rt', end: false },
+  { icon: Shield, label: 'Kelola Admin', path: '/superadmin/admin', end: false },
+];
 
 const adminNavItems = [
   { icon: Home, label: 'Dashboard', path: '/admin', end: true },
@@ -20,7 +26,7 @@ const wargaNavItems = [
 
 export function Sidebar() {
   const { role } = useAuth();
-  const navItems = role === 'admin' ? adminNavItems : wargaNavItems;
+  const navItems = role === 'super_admin' ? superAdminNavItems : role === 'admin' ? adminNavItems : wargaNavItems;
 
   return (
     <aside className="hidden md:flex w-64 flex-col border-r border-border bg-card">

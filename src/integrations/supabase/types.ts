@@ -21,6 +21,7 @@ export type Database = {
           jenis: string
           keterangan: string
           nominal: number
+          rt_id: string | null
           tagihan_id: string | null
           tanggal: string
         }
@@ -30,6 +31,7 @@ export type Database = {
           jenis: string
           keterangan: string
           nominal: number
+          rt_id?: string | null
           tagihan_id?: string | null
           tanggal?: string
         }
@@ -39,10 +41,18 @@ export type Database = {
           jenis?: string
           keterangan?: string
           nominal?: number
+          rt_id?: string | null
           tagihan_id?: string | null
           tanggal?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "buku_kas_rt_id_fkey"
+            columns: ["rt_id"]
+            isOneToOne: false
+            referencedRelation: "rt"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "buku_kas_tagihan_id_fkey"
             columns: ["tagihan_id"]
@@ -59,6 +69,7 @@ export type Database = {
           id: string
           nama: string
           nominal: number
+          rt_id: string | null
         }
         Insert: {
           created_at?: string
@@ -66,6 +77,7 @@ export type Database = {
           id?: string
           nama: string
           nominal?: number
+          rt_id?: string | null
         }
         Update: {
           created_at?: string
@@ -73,8 +85,17 @@ export type Database = {
           id?: string
           nama?: string
           nominal?: number
+          rt_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "kategori_iuran_rt_id_fkey"
+            columns: ["rt_id"]
+            isOneToOne: false
+            referencedRelation: "rt"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       notifications: {
         Row: {
@@ -151,6 +172,30 @@ export type Database = {
         }
         Relationships: []
       }
+      rt: {
+        Row: {
+          alamat: string | null
+          created_at: string
+          id: string
+          nama: string
+          updated_at: string
+        }
+        Insert: {
+          alamat?: string | null
+          created_at?: string
+          id?: string
+          nama: string
+          updated_at?: string
+        }
+        Update: {
+          alamat?: string | null
+          created_at?: string
+          id?: string
+          nama?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       rumah: {
         Row: {
           blok: string | null
@@ -160,6 +205,7 @@ export type Database = {
           kepala_keluarga: string
           no_hp: string | null
           no_rumah: string
+          rt_id: string | null
           status: string
           updated_at: string
           user_id: string | null
@@ -172,6 +218,7 @@ export type Database = {
           kepala_keluarga: string
           no_hp?: string | null
           no_rumah: string
+          rt_id?: string | null
           status?: string
           updated_at?: string
           user_id?: string | null
@@ -184,11 +231,20 @@ export type Database = {
           kepala_keluarga?: string
           no_hp?: string | null
           no_rumah?: string
+          rt_id?: string | null
           status?: string
           updated_at?: string
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "rumah_rt_id_fkey"
+            columns: ["rt_id"]
+            isOneToOne: false
+            referencedRelation: "rt"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       tagihan: {
         Row: {
@@ -245,25 +301,37 @@ export type Database = {
         Row: {
           id: string
           role: Database["public"]["Enums"]["app_role"]
+          rt_id: string | null
           user_id: string
         }
         Insert: {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
+          rt_id?: string | null
           user_id: string
         }
         Update: {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
+          rt_id?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_roles_rt_id_fkey"
+            columns: ["rt_id"]
+            isOneToOne: false
+            referencedRelation: "rt"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      get_user_rt_id: { Args: { _user_id: string }; Returns: string }
       get_user_rumah_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
@@ -272,9 +340,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_super_admin: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
-      app_role: "admin" | "warga"
+      app_role: "admin" | "warga" | "super_admin"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -402,7 +471,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "warga"],
+      app_role: ["admin", "warga", "super_admin"],
     },
   },
 } as const
