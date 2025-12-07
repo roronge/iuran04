@@ -16,6 +16,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency } from '@/lib/format';
 import { toast } from 'sonner';
 import { Loader2, Plus, Pencil, Trash2 } from 'lucide-react';
+import { useAdminRT } from '@/hooks/useAdminRT';
 
 interface KategoriIuran {
   id: string;
@@ -25,6 +26,7 @@ interface KategoriIuran {
 }
 
 export default function KategoriIuranPage() {
+  const { rtId, loading: rtLoading } = useAdminRT();
   const [kategoriList, setKategoriList] = useState<KategoriIuran[]>([]);
   const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({
@@ -35,14 +37,17 @@ export default function KategoriIuranPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchKategori();
-  }, []);
+    if (rtId) {
+      fetchKategori();
+    }
+  }, [rtId]);
 
   const fetchKategori = async () => {
     try {
       const { data, error } = await supabase
         .from('kategori_iuran')
         .select('*')
+        .eq('rt_id', rtId)
         .order('nama');
 
       if (error) throw error;
@@ -58,10 +63,16 @@ export default function KategoriIuranPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!rtId) {
+      toast.error('RT tidak ditemukan');
+      return;
+    }
+
     const payload = {
       nama: formData.nama,
       nominal: parseInt(formData.nominal) || 0,
       deskripsi: formData.deskripsi || null,
+      rt_id: rtId,
     };
 
     try {
@@ -115,7 +126,7 @@ export default function KategoriIuranPage() {
     setFormData({ nama: '', nominal: '', deskripsi: '' });
   };
 
-  if (loading) {
+  if (loading || rtLoading) {
     return (
       <AppLayout>
         <div className="flex items-center justify-center h-64">
