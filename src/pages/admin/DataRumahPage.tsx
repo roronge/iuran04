@@ -19,11 +19,11 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Loader2, Plus, Pencil, Trash2, Search } from 'lucide-react';
+import { useAdminRT } from '@/hooks/useAdminRT';
 
 interface Rumah {
   id: string;
@@ -37,6 +37,7 @@ interface Rumah {
 }
 
 export default function DataRumahPage() {
+  const { rtId, loading: rtLoading } = useAdminRT();
   const [rumahList, setRumahList] = useState<Rumah[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -51,14 +52,17 @@ export default function DataRumahPage() {
   });
 
   useEffect(() => {
-    fetchRumah();
-  }, []);
+    if (rtId) {
+      fetchRumah();
+    }
+  }, [rtId]);
 
   const fetchRumah = async () => {
     try {
       const { data, error } = await supabase
         .from('rumah')
         .select('*')
+        .eq('rt_id', rtId)
         .order('blok')
         .order('no_rumah');
 
@@ -74,6 +78,11 @@ export default function DataRumahPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!rtId) {
+      toast.error('RT tidak ditemukan');
+      return;
+    }
 
     try {
       if (editingRumah) {
@@ -101,7 +110,10 @@ export default function DataRumahPage() {
 
         toast.success('Data rumah berhasil diperbarui');
       } else {
-        const { error } = await supabase.from('rumah').insert(formData);
+        const { error } = await supabase.from('rumah').insert({
+          ...formData,
+          rt_id: rtId,
+        });
 
         if (error) throw error;
         toast.success('Rumah berhasil ditambahkan');
@@ -151,7 +163,7 @@ export default function DataRumahPage() {
   const totalAktif = rumahList.filter((r) => r.status === 'aktif').length;
   const totalNonAktif = rumahList.filter((r) => r.status === 'non-aktif').length;
 
-  if (loading) {
+  if (loading || rtLoading) {
     return (
       <AppLayout>
         <div className="flex items-center justify-center h-64">

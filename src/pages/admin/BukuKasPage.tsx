@@ -24,6 +24,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency, formatDate } from '@/lib/format';
 import { toast } from 'sonner';
 import { Loader2, Plus, Trash2 } from 'lucide-react';
+import { useAdminRT } from '@/hooks/useAdminRT';
 
 interface BukuKas {
   id: string;
@@ -34,6 +35,7 @@ interface BukuKas {
 }
 
 export default function BukuKasPage() {
+  const { rtId, loading: rtLoading } = useAdminRT();
   const [kasList, setKasList] = useState<BukuKas[]>([]);
   const [loading, setLoading] = useState(true);
   const [saldo, setSaldo] = useState(0);
@@ -45,14 +47,17 @@ export default function BukuKasPage() {
   });
 
   useEffect(() => {
-    fetchKas();
-  }, []);
+    if (rtId) {
+      fetchKas();
+    }
+  }, [rtId]);
 
   const fetchKas = async () => {
     try {
       const { data, error } = await supabase
         .from('buku_kas')
         .select('*')
+        .eq('rt_id', rtId)
         .order('tanggal', { ascending: false })
         .order('created_at', { ascending: false });
 
@@ -77,12 +82,18 @@ export default function BukuKasPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!rtId) {
+      toast.error('RT tidak ditemukan');
+      return;
+    }
+
     try {
       const { error } = await supabase.from('buku_kas').insert({
         tanggal: formData.tanggal,
         keterangan: formData.keterangan,
         jenis: formData.jenis,
         nominal: parseInt(formData.nominal) || 0,
+        rt_id: rtId,
       });
 
       if (error) throw error;
@@ -113,7 +124,7 @@ export default function BukuKasPage() {
     }
   };
 
-  if (loading) {
+  if (loading || rtLoading) {
     return (
       <AppLayout>
         <div className="flex items-center justify-center h-64">

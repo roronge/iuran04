@@ -8,13 +8,20 @@ import { supabase } from '@/integrations/supabase/client';
 import { getMonthName, getCurrentMonth, getCurrentYear } from '@/lib/format';
 import { toast } from 'sonner';
 import { Loader2, Zap } from 'lucide-react';
+import { useAdminRT } from '@/hooks/useAdminRT';
 
 export default function GenerateTagihanPage() {
+  const { rtId, loading: rtLoading } = useAdminRT();
   const [bulan, setBulan] = useState(getCurrentMonth().toString());
   const [tahun, setTahun] = useState(getCurrentYear().toString());
   const [loading, setLoading] = useState(false);
 
   const handleGenerate = async () => {
+    if (!rtId) {
+      toast.error('RT tidak ditemukan');
+      return;
+    }
+
     const bulanNum = parseInt(bulan);
     const tahunNum = parseInt(tahun);
 
@@ -26,18 +33,20 @@ export default function GenerateTagihanPage() {
     setLoading(true);
 
     try {
-      // Get all active rumah
+      // Get all active rumah in this RT
       const { data: rumahList, error: rumahError } = await supabase
         .from('rumah')
         .select('id')
-        .eq('status', 'aktif');
+        .eq('status', 'aktif')
+        .eq('rt_id', rtId);
 
       if (rumahError) throw rumahError;
 
-      // Get all kategori
+      // Get all kategori in this RT
       const { data: kategoriList, error: kategoriError } = await supabase
         .from('kategori_iuran')
-        .select('id, nominal');
+        .select('id, nominal')
+        .eq('rt_id', rtId);
 
       if (kategoriError) throw kategoriError;
 
@@ -88,6 +97,16 @@ export default function GenerateTagihanPage() {
       setLoading(false);
     }
   };
+
+  if (rtLoading) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>
