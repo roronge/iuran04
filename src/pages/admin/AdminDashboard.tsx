@@ -4,7 +4,8 @@ import { StatCard } from '@/components/ui/stat-card';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency, getMonthName, getCurrentMonth, getCurrentYear } from '@/lib/format';
-import { Home, Tag, Receipt, Wallet, Loader2 } from 'lucide-react';
+import { Loader2, MapPin } from 'lucide-react';
+import { useAdminRT } from '@/hooks/useAdminRT';
 
 interface DashboardStats {
   totalRumah: number;
@@ -15,6 +16,7 @@ interface DashboardStats {
 }
 
 export default function AdminDashboard() {
+  const { rtId, rtInfo, loading: rtLoading } = useAdminRT();
   const [stats, setStats] = useState<DashboardStats>({
     totalRumah: 0,
     totalKategori: 0,
@@ -25,20 +27,27 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchStats();
-  }, []);
+    if (rtId) {
+      fetchStats();
+    }
+  }, [rtId]);
 
   const fetchStats = async () => {
     try {
       const currentMonth = getCurrentMonth();
       const currentYear = getCurrentYear();
 
-      // Fetch all stats in parallel
+      // Fetch all stats in parallel - filtered by RT
       const [rumahRes, kategoriRes, tagihanRes, kasRes] = await Promise.all([
-        supabase.from('rumah').select('id', { count: 'exact' }).eq('status', 'aktif'),
-        supabase.from('kategori_iuran').select('id', { count: 'exact' }),
-        supabase.from('tagihan').select('nominal, status').eq('bulan', currentMonth).eq('tahun', currentYear),
-        supabase.from('buku_kas').select('nominal, jenis'),
+        supabase.from('rumah').select('id', { count: 'exact' }).eq('status', 'aktif').eq('rt_id', rtId),
+        supabase.from('kategori_iuran').select('id', { count: 'exact' }).eq('rt_id', rtId),
+        supabase
+          .from('tagihan')
+          .select('nominal, status, rumah!inner(rt_id)')
+          .eq('bulan', currentMonth)
+          .eq('tahun', currentYear)
+          .eq('rumah.rt_id', rtId),
+        supabase.from('buku_kas').select('nominal, jenis').eq('rt_id', rtId),
       ]);
 
       const totalRumah = rumahRes.count || 0;
@@ -69,7 +78,7 @@ export default function AdminDashboard() {
     }
   };
 
-  if (loading) {
+  if (loading || rtLoading) {
     return (
       <AppLayout>
         <div className="flex items-center justify-center h-64">
@@ -83,10 +92,21 @@ export default function AdminDashboard() {
     <AppLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold">Dashboard Admin RT</h1>
+          <div className="flex items-center gap-2 mb-1">
+            <h1 className="text-2xl font-bold">Dashboard Admin</h1>
+            {rtInfo && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary">
+                <MapPin className="h-3.5 w-3.5" />
+                {rtInfo.nama}
+              </span>
+            )}
+          </div>
           <p className="text-muted-foreground">
-            Ringkasan kondisi iuran & kas RT bulan {getMonthName(getCurrentMonth())} {getCurrentYear()}.
+            Ringkasan kondisi iuran & kas {rtInfo?.nama || 'RT'} bulan {getMonthName(getCurrentMonth())} {getCurrentYear()}.
           </p>
+          {rtInfo?.alamat && (
+            <p className="text-xs text-muted-foreground mt-1">{rtInfo.alamat}</p>
+          )}
         </div>
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
