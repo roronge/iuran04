@@ -24,12 +24,13 @@ export default function LoginPage() {
     );
   }
 
-  if (user) {
-    if (role) {
-      const redirectPath = role === 'super_admin' ? '/superadmin' : role === 'admin' ? '/admin' : '/warga';
-      return <Navigate to={redirectPath} replace />;
-    }
-    // Role masih loading, tampilkan loader
+  if (user && role) {
+    const redirectPath = role === 'super_admin' ? '/superadmin' : role === 'admin' ? '/admin' : '/warga';
+    return <Navigate to={redirectPath} replace />;
+  }
+
+  // User exists but role still loading
+  if (user && !role) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-teal-light to-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />

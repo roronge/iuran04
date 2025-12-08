@@ -42,32 +42,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    let isMounted = true;
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        if (!isMounted) return;
+        
         setSession(session);
         setUser(session?.user ?? null);
 
         if (session?.user) {
+          // Reset role while fetching to show loading state
+          setRole(null);
           setTimeout(() => {
-            fetchUserRole(session.user.id).then(setRole);
+            if (isMounted) {
+              fetchUserRole(session.user.id).then((fetchedRole) => {
+                if (isMounted) {
+                  setRole(fetchedRole);
+                  setLoading(false);
+                }
+              });
+            }
           }, 0);
         } else {
           setRole(null);
+          setLoading(false);
         }
-        setLoading(false);
       }
     );
 
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!isMounted) return;
+      
       setSession(session);
       setUser(session?.user ?? null);
+      
       if (session?.user) {
-        fetchUserRole(session.user.id).then(setRole);
+        fetchUserRole(session.user.id).then((fetchedRole) => {
+          if (isMounted) {
+            setRole(fetchedRole);
+            setLoading(false);
+          }
+        });
+      } else {
+        setLoading(false);
       }
-      setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {
