@@ -129,32 +129,18 @@ export default function ManageAdminPage() {
     setSubmitting(true);
 
     try {
-      // Create new user with admin role
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/`,
-          data: { full_name: formData.full_name }
+      // Use edge function to create admin with service role
+      const { data, error } = await supabase.functions.invoke('create-admin', {
+        body: {
+          email: formData.email,
+          password: formData.password,
+          full_name: formData.full_name,
+          rt_id: formData.rt_id
         }
       });
 
-      if (authError) throw authError;
-
-      if (!authData.user) {
-        throw new Error('Gagal membuat user');
-      }
-
-      // Update user_roles to set role as admin and assign RT
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .update({ 
-          role: 'admin',
-          rt_id: formData.rt_id 
-        })
-        .eq('user_id', authData.user.id);
-
-      if (roleError) throw roleError;
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
 
       toast.success('Admin berhasil ditambahkan');
       setIsDialogOpen(false);
